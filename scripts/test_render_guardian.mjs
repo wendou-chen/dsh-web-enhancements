@@ -1,6 +1,10 @@
-import { healMarkdownMath } from '../src/client/features/render-guardian/healer.ts';
+import { healMarkdownMath, healLatexFormula } from '../src/client/features/render-guardian/healer.ts';
 
 console.log('=== 开始执行 Render Guardian 数学公式与 Markdown 渲染自愈单元测试 ===\n');
+
+// -------------------------------------------------------------
+// 第 1 部分：Markdown 文本级自愈测试
+// -------------------------------------------------------------
 
 // 测试用例 1: 真实病例文本 (包含缩进错位与 Markdown 标题泄漏)
 const testCase1 = `
@@ -67,4 +71,56 @@ if (healed4.includes('（') || healed4.includes('）') || healed4.includes('：'
 }
 console.log('✅ [PASS] 测试用例 4: 全角标点转义成功\n');
 
-console.log('🎉 Render Guardian 文本自愈核心全部通过！');
+// -------------------------------------------------------------
+// 第 2 部分：LaTeX 公式语法级 7 阶启发式自愈测试 (解答题实机用例集)
+// -------------------------------------------------------------
+console.log('--- 开始测试 LaTeX 公式 7 阶启发式语法自愈算法 ---');
+
+const realSessionCases = [
+  {
+    name: '案例 A: 未包裹 aligned 的多行换行对齐式',
+    raw: `I &= \\int \\frac{\\sin t}{\\cos t} \\cdot \\left(\\frac{t}{\\sin t}\\right) \\cdot (2\\sin t \\cos t) \\,\\mathrm{d}t \\\\\n&= \\int 2t \\sin t \\,\\mathrm{d}t`,
+    expectedIncludes: ['\\begin{aligned}', '\\end{aligned}']
+  },
+  {
+    name: '案例 B: 跨换行未配对 \\left / \\right 积分相消式',
+    raw: `I = I_1 - I_2 &= \\left( x \\mathrm{e}^{\\sin x} - \\int \\mathrm{e}^{\\sin x} \\,\\mathrm{d}x \\right) - \\left( \\frac{\\mathrm{e}^{\\sin x}}{\\cos x} - \\int \\mathrm{e}^{\\sin x} \\,\\mathrm{d}x \\right) \\\\\n&= x \\mathrm{e}^{\\sin x} - \\frac{\\mathrm{e}^{\\sin x}}{\\cos x} + C \\\\\n&= (x - \\sec x)\\mathrm{e}^{\\sin x} + C`,
+    expectedIncludes: ['\\begin{aligned}', '\\end{aligned}']
+  },
+  {
+    name: '案例 C: 宏与括号混合推导式',
+    raw: `u'(x) + u(x)\\cos x &= \\left( \\mathbf{1} - \\frac{\\sin x}{\\cos^2 x} \\right) + (x\\cos x - \\mathbf{1}) \\\\\n&= (\\mathbf{1} - \\mathbf{1}) + x\\cos x - \\frac{\\sin x}{\\cos^2 x} \\\\\n&= x\\cos x - \\frac{\\sin x}{\\cos^2 x}`,
+    expectedIncludes: ['\\begin{aligned}']
+  },
+  {
+    name: '案例 D: 包含 \\rarr, \\bold, \\degree 宏与中文说明',
+    raw: `f(x) \\rarr 0 \\quad 当 x \\rarr \\infty, \\; \\bold{A} \\cdot \\bold{B} = 90\\degree`,
+    expectedIncludes: ['\\rightarrow', '\\mathbf{A}', '\\mathbf{B}', '^\\circ', '\\text{当}']
+  },
+  {
+    name: '案例 E: \\begin{align*} 不受支持环境自动标准化',
+    raw: `\\begin{align*}\nx &= y + 1 \\\\\ny &= z + 2\n\\end{align*}`,
+    expectedIncludes: ['\\begin{aligned}', '\\end{aligned}']
+  },
+  {
+    name: '案例 F: 截断未闭合花括号与 HTML 实体',
+    raw: `\\int_0^1 \\frac{x &amp; + 1}{\\sqrt{x^2 + 1}`,
+    expectedIncludes: ['x & + 1', '}']
+  }
+];
+
+for (const tc of realSessionCases) {
+  const result = healLatexFormula(tc.raw);
+  console.log(`\n测试: ${tc.name}`);
+  console.log('输入:', JSON.stringify(tc.raw.slice(0, 60)) + '...');
+  console.log('自愈后:', JSON.stringify(result.slice(0, 60)) + '...');
+
+  for (const exp of tc.expectedIncludes) {
+    if (!result.includes(exp)) {
+      throw new Error(`测试用例 [${tc.name}] 失败: 缺少预期语法 [${exp}]`);
+    }
+  }
+  console.log(`✅ [PASS] ${tc.name}`);
+}
+
+console.log('\n🎉 Render Guardian 文本与 LaTeX 语法双引擎自愈全部 100% 通过！');

@@ -406,4 +406,24 @@ export const ENHANCEMENT_STYLES = `
   font-size: 14px;
   line-height: 1.6;
 }
+
+/* 7. Render Guardian: 自愈公式高清重渲染容器 */
+.dsh-math-healed-wrapper {
+  display: block;
+  margin: 0.8em 0;
+  text-align: center;
+  position: relative;
+  transition: all 0.2s ease;
+  animation: dsh-math-fade-in 0.25s ease-out;
+}
+
+.dsh-math-healed-wrapper:hover {
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.25));
+}
+
+@keyframes dsh-math-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 `;
+

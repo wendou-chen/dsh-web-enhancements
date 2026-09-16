@@ -1,14 +1,59 @@
 /**
- * DSH DOM 级 LaTeX 渲染错误拦截与优雅降级控制器
+ * DSH DOM 级 LaTeX 渲染错误拦截、启发式自愈与无损重渲染控制器
  */
 import { copyToClipboard } from '../../shared/clipboard.js';
-import { healMarkdownMath } from './healer.js';
+import { healMarkdownMath, healLatexFormula } from './healer.js';
+
+/**
+ * 确保页面中具备 KaTeX 渲染引擎（优先复用页面已有环境，缺失时安全异步补充）
+ */
+let katexPromise: Promise<any> | null = null;
+function ensureKatex(): Promise<any> {
+  if ((window as any).katex) {
+    return Promise.resolve((window as any).katex);
+  }
+  if (katexPromise) return katexPromise;
+
+  katexPromise = new Promise((resolve) => {
+    // 检查是否已有对应 script 标签
+    const existingScript = document.querySelector('script[src*="katex"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve((window as any).katex));
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js';
+    script.async = true;
+    script.onload = () => {
+      resolve((window as any).katex);
+    };
+    script.onerror = () => {
+      console.warn('[dsh-web-enhancements] 未能加载外部 KaTeX 渲染垫片');
+      resolve(null);
+    };
+    document.head.appendChild(script);
+
+    // 补充 KaTeX 核心 CSS（若页面缺失）
+    if (!document.querySelector('link[href*="katex"]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css';
+      document.head.appendChild(link);
+    }
+  });
+
+  return katexPromise;
+}
 
 export class RenderGuardian {
   private observer: MutationObserver | null = null;
   private isProcessing = false;
 
   public start(): void {
+    // 启动时预热 KaTeX 引擎
+    void ensureKatex();
+
     this.scanAndHealErrors();
 
     this.observer = new MutationObserver((mutations) => {
@@ -50,14 +95,17 @@ export class RenderGuardian {
 
   private handleErrorElement(el: HTMLElement): void {
     // 避免重复处理
-    if (el.getAttribute('data-dsh-handled') === 'true' || el.closest('.dsh-math-error-container')) {
+    if (el.getAttribute('data-dsh-handled') === 'true' || el.closest('.dsh-math-error-container') || el.closest('.dsh-math-healed-wrapper')) {
       return;
     }
 
     el.setAttribute('data-dsh-handled', 'true');
 
-    // 提取原始内容
-    const rawContent = el.getAttribute('title') || el.textContent || '';
+    // 关键修正：在 KaTeX 错误节点中，el.textContent 存储的是真实的 LaTeX 源码，而 title 属性是错误堆栈
+    let rawContent = el.textContent || '';
+    if (!rawContent.trim() && el.getAttribute('title')) {
+      rawContent = el.getAttribute('title') || '';
+    }
     if (!rawContent.trim()) return;
 
     // 清理 KaTeX 默认的刺眼大红色
@@ -74,9 +122,8 @@ export class RenderGuardian {
       const container = document.createElement('div');
       container.className = 'dsh-math-escaped-block';
       container.setAttribute('data-dsh-handled', 'true');
-      
+
       const healedText = healMarkdownMath(rawContent);
-      // 以预格式化或结构化段落呈现，消除红字影响
       const p = document.createElement('div');
       p.className = 'dsh-math-healed-text';
       p.textContent = healedText;
@@ -86,7 +133,59 @@ export class RenderGuardian {
       return;
     }
 
-    // 判定 2：纯粹的 LaTeX 语法畸变（如 \frac{1}{ 缺失等），包装为低对比度优雅错误胶囊
+    // 判定 2：纯粹的 LaTeX 语法畸变（如缺少 \begin{aligned}、括号不闭合、非标准宏、未包裹中文等）
+    // 启动 7 阶启发式语法自愈流水线
+    const healedLatex = healLatexFormula(rawContent);
+
+    // 尝试二次编译重渲染
+    void this.tryRenderHealedFormula(el, rawContent, healedLatex);
+  }
+
+  /**
+   * 尝试调用 KaTeX 将自愈后的 LaTeX 源码重渲染为高清数学公式
+   */
+  private async tryRenderHealedFormula(
+    targetEl: HTMLElement,
+    originalRaw: string,
+    healedLatex: string
+  ): Promise<void> {
+    const katex = await ensureKatex();
+
+    if (katex) {
+      try {
+        const renderedHtml = katex.renderToString(healedLatex, {
+          displayMode: true,
+          throwOnError: false,
+          strict: false,
+        });
+
+        // 若重渲染结果中不再包含错误类，说明自愈成功，原位替换为高清公式节点
+        if (renderedHtml && !renderedHtml.includes('class="katex-error"')) {
+          const wrapper = document.createElement('span');
+          wrapper.className = 'katex-display dsh-math-healed-wrapper';
+          wrapper.setAttribute('data-dsh-handled', 'true');
+          wrapper.setAttribute('title', '✨ 已由增强插件自动纠正公式语法并恢复高清渲染 (点击可复制 LaTeX)');
+          wrapper.innerHTML = renderedHtml;
+
+          // 保持与 formula-copy 特性的无缝互通
+          wrapper.setAttribute('data-dsh-latex', healedLatex);
+
+          targetEl.replaceWith(wrapper);
+          return;
+        }
+      } catch (renderError) {
+        console.warn('[dsh-web-enhancements] 二次重渲染捕获异常，降级显示错误胶囊:', renderError);
+      }
+    }
+
+    // 若自愈重渲染未成功，降级包装为低对比度优雅折叠错误胶囊（兜底保护）
+    this.fallbackToErrorPill(targetEl, originalRaw, healedLatex);
+  }
+
+  /**
+   * 兜底降级呈现错误胶囊
+   */
+  private fallbackToErrorPill(targetEl: HTMLElement, originalRaw: string, healedLatex: string): void {
     const container = document.createElement('span');
     container.className = 'dsh-math-error-container';
     container.setAttribute('data-dsh-handled', 'true');
@@ -109,7 +208,7 @@ export class RenderGuardian {
 
     const code = document.createElement('code');
     code.className = 'dsh-math-error-code';
-    code.textContent = rawContent;
+    code.textContent = healedLatex || originalRaw;
 
     const copyBtn = document.createElement('button');
     copyBtn.type = 'button';
@@ -117,7 +216,7 @@ export class RenderGuardian {
     copyBtn.textContent = '📋 复制 LaTeX';
     copyBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      copyToClipboard(rawContent).then(() => {
+      copyToClipboard(healedLatex || originalRaw).then(() => {
         copyBtn.textContent = '✅ 已复制';
         setTimeout(() => {
           copyBtn.textContent = '📋 复制 LaTeX';
@@ -139,7 +238,7 @@ export class RenderGuardian {
     container.appendChild(pill);
     container.appendChild(details);
 
-    el.replaceWith(container);
+    targetEl.replaceWith(container);
   }
 
   public dispose(): void {

@@ -1,7 +1,7 @@
 {
   "name": "dsh-web-enhancements",
-  "version": "0.1.0",
-  "description": "DeepSeek Harness (DSH) Web & Desktop 全能增强套件 (LaTeX公式一键复制 / Mermaid交互渲染 / Voyager划词引用 / 发送模式无缝切换与原生插话 / 输入框智能折叠与沉浸式唤醒 / 渲染容错智能自愈)",
+  "version": "0.2.0",
+  "description": "DeepSeek Harness (DSH) Web & Desktop 全能增强套件 (LaTeX公式一键复制 / Mermaid交互渲染 / Voyager划词引用 / 发送模式无缝切换与原生插话 / 输入框智能折叠与沉浸式唤醒 / 7阶启发式LaTeX语法自愈与无损重渲染)",
   "type": "module",
   "main": "./lib/index.js",
   "types": "./lib/types/index.d.ts",
@@ -27,6 +27,7 @@
     "latex",
     "mermaid",
     "quote-reply",
+    "render-guardian",
     "enhancement-plugin"
   ],
   "peerDependencies": {

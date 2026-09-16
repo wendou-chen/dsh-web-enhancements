@@ -22,6 +22,101 @@ const FULLWIDTH_MAP: Record<string, string> = {
 };
 
 /**
+ * 纯函数：对原始 LaTeX 公式文本进行 7 阶启发式语法自愈与规范化
+ */
+export function healLatexFormula(raw: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+
+  let healed = raw.trim();
+
+  // 0. 清理 KaTeX 错误信息污染与外层围栏（移除错误高亮组合字符 \u0332、前缀及裸 $$ 符号）
+  if (healed.startsWith('ParseError:')) {
+    const match = healed.match(/at position \d+:\s*([\s\S]+)$/);
+    if (match) {
+      healed = match[1];
+    }
+  }
+  healed = healed.replace(/[\u0300-\u036f]/g, ''); // 移除下划线等组合字符
+  healed = healed.replace(/^\$\$+|\$\$+$/g, '').replace(/^\$+|\$+$/g, '').trim();
+
+  // 1. XML / HTML 实体反转义
+  healed = healed
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ');
+
+  // 2. 宏命令与特殊符号纠正
+  healed = healed
+    .replace(/\\rarr\b/g, '\\rightarrow')
+    .replace(/\\larr\b/g, '\\leftarrow')
+    .replace(/\\lrarr\b/g, '\\leftrightarrow')
+    .replace(/\\doublebarwedge\b/g, '\\overline{=}')
+    .replace(/\\bold\{/g, '\\mathbf{')
+    .replace(/\\oiint\b/g, '\\iint')
+    .replace(/\\degree\b/g, '^\\circ')
+    .replace(/\\s\.t\.\b/g, '\\text{s.t.}');
+
+  // 3. 环境名称规范化 (KaTeX 顶层不支持 align / gather，需统一转为 aligned / gathered)
+  healed = healed
+    .replace(/\\begin\{align\*?\}/g, '\\begin{aligned}')
+    .replace(/\\end\{align\*?\}/g, '\\end{aligned}')
+    .replace(/\\begin\{gather\*?\}/g, '\\begin{gathered}')
+    .replace(/\\end\{gather\*?\}/g, '\\end{gathered}');
+
+  // 4. Alignment 自动包裹与环境闭合配平
+  const openEnvCount = (healed.match(/\\begin\{(?:aligned|matrix|bmatrix|pmatrix|vmatrix|cases|array|split|gathered)\}/g) || []).length;
+  const closeEnvCount = (healed.match(/\\end\{(?:aligned|matrix|bmatrix|pmatrix|vmatrix|cases|array|split|gathered)\}/g) || []).length;
+
+  if (openEnvCount === 0 && closeEnvCount === 0 && (/&|\\\\/.test(healed))) {
+    // 既没有 \begin 也没有 \end，但包含 & 或 \\：整体包裹
+    healed = `\\begin{aligned}\n${healed}\n\\end{aligned}`;
+  } else if (openEnvCount > closeEnvCount) {
+    // 缺少 \end：补齐尾部
+    healed += '\n\\end{aligned}'.repeat(openEnvCount - closeEnvCount);
+  } else if (closeEnvCount > openEnvCount) {
+    // 缺少 \begin：补齐头部
+    healed = '\\begin{aligned}\n'.repeat(closeEnvCount - openEnvCount) + healed;
+  }
+
+  // 5. 行级 \left 与 \right 括号配平守卫
+  // LaTeX 规定 \left 和 \right 不得跨越换行符 \\，否则 KaTeX 会抛出 Expected '\right', got '\end'
+  let lines = healed.split('\\\\');
+  lines = lines.map((line) => {
+    // 排除转义的反斜杠等干扰
+    const openLeftMatches = line.match(/\\left(?:[\(\[\{\.\|\/\\]|\\vert|\\Vert|\\langle|\\lfloor|\\lceil)/g) || [];
+    const closeRightMatches = line.match(/\\right(?:[\)\]\}\.\|\/\\]|\\vert|\\Vert|\\rangle|\\rfloor|\\rceil)/g) || [];
+
+    const openLeft = openLeftMatches.length;
+    const closeRight = closeRightMatches.length;
+
+    if (openLeft > closeRight) {
+      line += ' \\right.'.repeat(openLeft - closeRight);
+    } else if (closeRight > openLeft) {
+      line = ' \\left.'.repeat(closeRight - openLeft) + line;
+    }
+    return line;
+  });
+  healed = lines.join('\\\\');
+
+  // 6. 全局大括号闭合检查
+  // 补齐末尾未闭合的大括号
+  const openBraces = (healed.match(/(?<!\\)\{/g) || []).length;
+  const closeBraces = (healed.match(/(?<!\\)\}/g) || []).length;
+  if (openBraces > closeBraces) {
+    healed += '}'.repeat(openBraces - closeBraces);
+  }
+
+  // 7. CJK 中文字符包裹（防止在数学模式下直接报错）
+  healed = healed.replace(
+    /([^\\](?:\\quad|\\qquad|\s|^))([\u4e00-\u9fa5\uff0c\uff08\uff09\uff1a\u3002\u3001]+)/g,
+    '$1\\text{$2}'
+  );
+
+  return healed;
+}
+
+/**
  * 纯函数：对原始 Markdown 文本进行四级数学公式渲染容错与自愈修复
  */
 export function healMarkdownMath(raw: string): string {
