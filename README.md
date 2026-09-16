@@ -198,6 +198,16 @@ node "$env:USERPROFILE\.dsh\.agents\skills\dsh-extension-guard\scripts\verify_ds
 
 ---
 
+## 🧩 生态与相关项目
+
+| 项目 | 定位 | 与本套件的关系 |
+|---|---|---|
+| [**dsh-render-perf**](https://github.com/wendou-chen/dsh-render-perf) | DSH Web 公式渲染性能治理 | **互补，可叠加安装**。本套件负责 UI 与交互增强；该插件负责渲染性能——在 HTTP 响应流中为前端数学渲染函数注入结果缓存，并让滚动视口外的消息块退出渲染流水线。公式密集型长会话的切换卡顿实测降低 **75%**（1832 ms → 455 ms）。 |
+
+> 两者**零代码耦合**。本套件走稳定的 DOM / Slot 契约，迭代节奏跟随功能需求；而 `dsh-render-perf` 的补丁锚定 DSH 前端产物内部实现，必须跟随 DSH 版本适配，因此独立成库维护。同时安装没有任何冲突——本套件的公式点击复制、Render Guardian 等特性在该插件生效后均已回归验证。
+
+---
+
 ## 🤝 参与贡献
 
 欢迎提交 Issue 与 Pull Request！
