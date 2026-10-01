@@ -1,14 +1,43 @@
-import { fileURLToPath } from 'node:url'
 import type { UserConfig } from 'tsdown'
 
 const PLUGIN_ID = "dsh-web-enhancements"
 
 const CLIENT_EXTERNALS = [
-  'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client',
+  'react',
+  'react/jsx-runtime',
+  'react-dom',
   'cordis',
   '@deepseek-ai/dsh-client-ui-slots',
+  '@deepseek-ai/dsh-client-ui-layout',
   '@deepseek-ai/dsh-client-runtime/client',
 ]
+
+const hostBundle: UserConfig = {
+  entry: {
+    index: 'src/index.ts',
+    schema: 'src/schema.ts',
+    'win-toast': 'src/win-toast.ts',
+  },
+  outDir: 'lib',
+  format: 'esm',
+  platform: 'node',
+  dts: false,
+  sourcemap: true,
+  clean: false,
+  deps: {
+    neverBundle: [
+      '@deepseek-ai/cordis',
+      '@deepseek-ai/schemastery',
+      'cordis',
+      'schemastery',
+      'node:child_process',
+      'node:buffer',
+    ],
+  },
+  outputOptions: {
+    entryFileNames: '[name].js',
+  },
+}
 
 const clientBundle: UserConfig = {
   entry: { client: 'src/client/index.ts' },
@@ -34,4 +63,4 @@ const clientBundle: UserConfig = {
   },
 }
 
-export default [clientBundle] satisfies UserConfig[]
+export default [hostBundle, clientBundle] satisfies UserConfig[]

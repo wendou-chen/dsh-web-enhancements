@@ -8,96 +8,68 @@
 
 **DSH 全能增强套件 (`dsh-web-enhancements`)** 是专为 **DeepSeek Harness (DSH)** 深度定制的一站式全功能前端与宿主增强插件。
 
-全面兼容 **DSH Web 端** 与 **DSH Desktop 桌面端**，无缝补齐大模型对话中的公式交互、图表渲染、长文本划词、输入流控制与界面防遮挡痛点，提供媲美原生桌面应用的流畅交互体验。
+全面兼容 **DSH Web 端** 与 **DSH Desktop 桌面端**，无缝补齐大模型对话中的公式交互、图表渲染、长文本划词、输入流控制、模式快速轮转、工作区绝对路径复制与界面防遮挡痛点，提供媲美原生桌面应用的极致交互体验。
 
 ---
 
 ## ✨ 核心特性矩阵
 
-### 1. 🧮 LaTeX 数学公式一键复制 (LaTeX Click-to-Copy)
-- **悬停感知**：鼠标划过 KaTeX / MathJax 数学公式时自动高亮微蓝边框并转换为复制手型；
-- **智能源码提取**：点击公式即刻从 DOM / `<annotation>` 节点提取原始 LaTeX 代码；
-- **XML 实体反转义**：自动修复矩阵和多行公式中的 HTML 转义符（如 `&amp;` ➔ `&`、`&lt;` ➔ `<`），复制出的公式可直接无缝粘贴至 Overleaf、Typora 或 LaTeX 编译器；
-- **毛玻璃 Toast 预览**：顶部浮现高质感毛玻璃气泡，实时展示已复制的 LaTeX 源码缩略预览。
+### 1. 📁 工作区绝对物理路径秒级复制 (Workspace Path One-Click Copy)
+- **左侧列表 Hover 快捷按钮**：悬停工作区条目时，在操作栏直接浮现 `📁 / 📋` 路径复制图标，单击秒级提取绝对路径；
+- **悬浮控制球一键直达**：FAB 快捷菜单中提供「📋 复制当前工作区路径」；
+- **8 重多级防御解析引擎**：URL Hash 逆查 ➔ `workspaces.items` 会话反查 ➔ React Fiber 节点直读 ➔ 标题匹配 ➔ Windows 路径反斜杠规范化，彻底解决从前端提取底层物理路径的痛点。
 
-### 2. 📊 Mermaid 交互式图表渲染引擎 (Mermaid Interactive Canvas)
+### 2. 🎯 Shift+Tab 智能模式轮转 (Shift+Tab Mode Cycling)
+- **全局三态轮转**：在任意聚焦状态下按下 `Shift+Tab`，在「标准模式 ⇄ Plan 计划模式 ⇄ Goal 目标模式」之间丝滑切换；
+- **自定义 Agent 预设自适应**：自动识别自定义 Agent 预设（无 Goal 模式能力），智能降级为「标准模式 ⇄ Plan 模式」双态闭环；
+- **焦点与输入保护**：零吞字、零光标跳动，配合毛玻璃高对比度 Toast 提供清晰视觉反馈。
+
+### 3. 🎈 可拖拽悬浮控制球 (Draggable FAB Quick Controller)
+- **原生指针重置**：光标维持标准点击手型 `cursor: pointer`，彻底移除 `grab` 抓手光标困扰；
+- **100% 点击穿透隔离**：容器层声明 `pointer-events: none`，仅在小球圆盘与激活菜单启用 `pointer-events: auto`，绝不遮挡底层网页交互；
+- **集成快捷菜单**：一键切换发送模式、开启/关闭划词引用、开启/关闭公式复制、收起/展开输入框、复制工作区路径。
+
+### 4. 🧮 LaTeX 数学公式一键复制与去重 (LaTeX Click-to-Copy & De-nesting)
+- **单层纯净微光外框**：通过 `:not(.katex-display *)` 排除嵌套子节点，并显式清除子节点样式，彻底消除 KaTeX 块级公式内部双层同心框与背景色叠加；
+- **悬停感知与智能源码提取**：划过公式高亮微蓝边框，点击瞬间提取原始 LaTeX 代码；
+- **XML 实体反转义**：自动消除 `&amp;`、`&lt;` 等转义字符，复制结果可直接粘贴至 Overleaf、Typora 或 Markdown 笔记；
+- **毛玻璃 Toast 预览**：顶部浮现高质感气泡，实时展示已复制的 LaTeX 源码。
+
+### 5. 📊 Mermaid 交互式图表渲染引擎 (Mermaid Interactive Canvas)
 - **动态自动渲染**：自动识别模型输出的 ` ```mermaid ` 代码块并渲染为矢量级高清交互 SVG；
-- **全功能控制栏**：
-  - 🔍 **缩放/平移**：支持放大、缩小、原点复位与鼠标拖拽自由平移（Pan & Zoom）；
-  - 📋 **源码复制**：一键复制原始 Mermaid 流程图/时序图/类图 DSL；
-  - 💾 **SVG 导出**：一键将当前图表导出为独立高清矢量 SVG 文件；
-  - 🔲 **全屏 Modal 视窗**：点击全屏按钮展开大视口沉浸式预览复杂系统架构图；
-- **流式防抖与容错**：内置 300ms 打字防抖，语法解析异常时自动展示局部错误 Banner 并保留代码块，绝不破坏页面流。
+- **全功能控制栏**：支持缩放、平移（Pan & Zoom）、源码复制、导出 SVG 与全屏沉浸式预览；
+- **流式防抖与容错**：内置 300ms 打字防抖，语法解析异常时自动展示局部错误 Banner，绝不破坏页面流。
 
-### 3. 💬 Voyager 风格划词引用回复 (Smart Quote & Reply)
-- **智能悬浮气泡**：选中会话中的任意段落时，自动在选区上方居中浮现「💬 引用回复」胶囊按钮；
-- **高保真逆向格式化**：
-  - 选区内的数学公式自动反解析为标准的 Markdown 行内公式 `$...$` 或块级公式 `$$...$$`；
-  - 选区内的代码块高保真保留语言标签与原有缩进排版；
-- **Lexical / DOM 状态穿透**：穿透 React / Lexical 受控状态机，安全将 `> 引用文本` 插入输入框，并自动对焦在引用段落下方首个空行，直接输入回复即可。
+### 6. 💬 Voyager 风格划词引用回复 (Smart Quote & Reply)
+- **智能悬浮气泡**：选中会话中的任意段落时，自动在选区上方浮现「💬 引用回复」胶囊按钮（已消除黑边与未脱底方块）；
+- **高保真逆向格式化**：选区内的公式自动反解析为 `$...$` / `$$...$$`，代码块保留语言标签与缩进；
+- **状态穿透注入**：穿透 React / Lexical 受控状态机安全插入 `> 引用文本`，并自动对焦在下方空行。
 
-### 4. ⚡ 发送快捷键切换与原生插话 (Send Mode & Native Steer)
-- **双模式一键切换**：
-  - **`Ctrl+Enter 发送` 模式（默认推荐）**：单按 `Enter` 换行，组合键 `Ctrl+Enter` 快速发送，极大便利长 Prompt 编写；
-  - **`Enter 发送` 模式**：单按 `Enter` 发送，`Shift+Enter` 换行，贴合日常 IM 习惯；
-- **三重输入法（IME）防抖屏障**：
-  - 结合 `isComposing` 事件标志、`keyCode === 229` 与 50ms 状态锁，100% 杜绝拼音/五笔输入法选字回车时的误发送；
-- **原生生成态插话（Steer Bypass）**：
-  - 与 DSH 官方 `busyEnter: queue` 深度协同；
-  - 模型流式生成时按下 `Ctrl+Enter` 自动放行原生 `accelerated` 加速手势，**100% 触发原生 `Steer` 插话**，空闲时毫秒级直发，杜绝长文本掉入后台排队队列。
+### 7. ⚡ 发送快捷键切换与原生插话 (Send Mode & Native Steer)
+- **双模式一键切换**：支持 `Ctrl+Enter 发送`（单按 Enter 换行）与 `Enter 发送`（Shift+Enter 换行）；
+- **三重输入法（IME）防抖屏障**：结合 `isComposing`、`keyCode === 229` 与 50ms 状态锁，100% 杜绝输入法选字回车误发；
+- **原生生成态插话（Steer Bypass）**：与 DSH 官方 `busyEnter: queue` 深度协同，生成态按 `Ctrl+Enter` 触发原生 `Steer` 插话。
 
-### 5. 📉 输入框智能折叠与沉浸式唤醒 (Smart Compact & Wakeup)
-- **单行紧凑模式（38px）**：点击「📉 收起输入」按钮，将底部输入区域平滑收缩至 38px，彻底消除对上方聊天记录的遮挡与鼠标事件拦截；
-- **沉浸式打字唤醒（Type-to-Expand）**：收起状态下无需手动点开，**直接在键盘敲击任意字符，输入框瞬间以 `0.22s` 平滑动画展开**，首字 100% 录入、零吞字、零延迟；
-- **智能点击唤醒（Click-to-Expand）**：收起状态下点击输入框任意区域，自动展开并精准将光标停留在文本末尾；
-- **快捷避让（Escape-to-Collapse）**：在展开编辑时长文本后，按 **`Escape` 键**即可瞬间收起为紧凑单行条。
+### 8. 📉 输入框智能折叠与沉浸式唤醒 (Smart Compact & Wakeup)
+- **单行紧凑模式（38px）**：一键将底部输入区域平滑收缩至 38px，彻底消除对聊天记录的遮挡；
+- **打字与点击唤醒**：直接敲击键盘或点击输入区，`0.22s` 平滑动画展开，首字 100% 录入、零吞字；
+- **快捷避让**：按 `Escape` 键即可瞬间收起为紧凑单行条。
 
-### 6. 🛡️ Render Guardian 智能自愈引擎 (DOM Render Guardian)
-- **DOM 突变监控**：通过 `MutationObserver` 实时守护页面渲染流水线；
-- **公式与 Markdown 局部自愈**：自动修复流式生成过程中的语法断裂与奇数未闭合公式符号；
-- **插槽与组件生命周期防护**：避免由于异常渲染导致的白屏或上下文错位。
+### 9. 🛡️ Render Guardian 智能自愈引擎 (DOM Render Guardian)
+- **7 阶启发式语法自愈**：消除 HTML 实体、纠正宏与符号、环境标准化、对齐自动包裹、`\left` / `\right` 逐行平衡、花括号闭合、中文数学隔离；
+- **无损实时重渲染**：捕获 `.katex-error` 节点就地重渲染为矢量数学，彻底根治公式红字报错。
+
+### 10. 🔍 工作区文件快速过滤 (Sidebar File Search)
+- **右侧文件树快速检索**：在文件列表顶部注入过滤搜索栏，即时高亮匹配项并联动 Markdown 预览。
+
+### 11. 🔔 任务完成提示音与通知窗 (Task Notifier)
+- **多端任务通知**：任务结束时触发提示音，并支持可缩放浮窗展示最新进度。
 
 ---
 
-## ⌨️ 快捷键速查表
+## 🏗️ 架构与设计规范
 
-| 操作 / 场景 | `Ctrl+Enter 发送` 模式 (默认) | `Enter 发送` 模式 |
-| :--- | :--- | :--- |
-| **发送消息 / 提交提示词** | <kbd>Ctrl</kbd> + <kbd>Enter</kbd> (或 <kbd>Cmd</kbd> + <kbd>Enter</kbd>) | <kbd>Enter</kbd> |
-| **输入框换行** | <kbd>Enter</kbd> | <kbd>Shift</kbd> + <kbd>Enter</kbd> |
-| **生成中即时插话 (Steer)** | <kbd>Ctrl</kbd> + <kbd>Enter</kbd> | <kbd>Ctrl</kbd> + <kbd>Enter</kbd> |
-| **收起输入框 (避让上方正文)** | <kbd>Escape</kbd> (或点击右侧胶囊) | <kbd>Escape</kbd> (或点击右侧胶囊) |
-| **唤醒展开输入框** | 直接键盘打字 / 鼠标点击输入框 | 直接键盘打字 / 鼠标点击输入框 |
-| **复制数学公式源码** | 鼠标左键点击公式任意位置 | 鼠标左键点击公式任意位置 |
-
----
-
-## 🏗️ 架构与底层工程规范
-
-```
-dsh-web-enhancements/
-├── cordis.patch.yml          # DSH 宿主 Cordis 依赖装配补丁
-├── package.json              # 模块元数据与 Peer 依赖声明
-├── tsdown.config.ts          # 基于 Rolldown 的沙箱前端打包配置 (window.__ModuleLoader__)
-├── tsconfig.json             # TypeScript 编译配置 (ES2023 / NodeNext)
-├── src/
-│   ├── index.ts              # Host 侧插件入口 (Cordis Microkernel Lifecycle)
-│   ├── schema.ts             # Schemastery 配置契约定义
-│   └── client/               # 前端 Client 沙箱增强核心
-│       ├── index.ts          # 前端总入口与 SlotRegistry 双键插槽注册
-│       ├── styles.ts         # 响应式主题与动效样式表
-│       ├── features/         # 独立功能域 (可插拔解耦)
-│       │   ├── collapse/     # 输入框紧凑折叠与智能打字唤醒控制器
-│       │   ├── formula-copy/ # LaTeX / KaTeX / MathJax 提取与反转义器
-│       │   ├── mermaid/      # Mermaid 动态渲染器与交互工具栏
-│       │   ├── quote-reply/  # Voyager 划词拦截与 Lexical AST 注入器
-│       │   ├── render-guardian/ # DOM 突变监控与 Markdown/LaTeX 容错自愈
-│       │   └── send-mode/    # 发送状态机与 IME 三重防抖策略
-│       └── shared/           # 通用工具层 (剪贴板 / DOM 操作 / 毛玻璃 Toast)
-└── scripts/                  # 自动化场景验证与构建脚本
-```
-
-### 1. 严格契约：Cordis 双键插槽规范
+### 1. 插槽双键注册契约规范
 为了同时兼容 DSH 内置的 `list` 类型插槽（强校验 `options.id`）与 `keyed` 类型插槽（强校验 `options.key`），插件内部在注册所有插槽时均严格保持双键对齐：
 ```typescript
 ctx.slots.inject('settings.plugin.item', () =>
@@ -174,6 +146,9 @@ web-enhancements:
   enableSendMode: true          # 启用快捷键发送模式切换
   defaultSendMode: 'ctrl-enter' # 默认模式：'ctrl-enter' (推荐) 或 'enter'
   enableInputCollapse: true     # 启用底部输入框原生一键收起/展开与防遮挡治理
+  enableWorkspacePath: true     # 启用工作区物理路径秒级复制
+  enableModeCycle: true         # 启用 Shift+Tab 智能模式轮转 (标准/Plan/Goal)
+  enableFloatingBall: true      # 启用可拖拽悬浮控制球
 ```
 
 ---
@@ -192,8 +167,8 @@ node scripts/test_render_guardian.mjs
 # 3. 运行引用回复焦点与光标下移自动化测试
 node scripts/verify_quote_reply_focus.mjs
 
-# 4. 执行 DSH Extension Guard v4.0 端到端生命周期与健康自检
-node "$env:USERPROFILE\.dsh\.agents\skills\dsh-extension-guard\scripts\verify_dsh.mjs"
+# 4. 执行 DSH Extension Guard 端到端生命周期与分诊健康自检
+node "$env:USERPROFILE\.codex\skills\dsh-extension-guard\scripts\dispatch_doctor.mjs"
 ```
 
 ---

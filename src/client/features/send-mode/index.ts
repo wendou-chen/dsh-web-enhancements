@@ -1,28 +1,15 @@
 import { SendModePolicy, SendMode } from './policy.js';
 
-export function initSendMode(defaultMode: SendMode = 'ctrl-enter'): () => void {
+export interface SendModeController {
+  getMode: () => SendMode;
+  toggleMode: () => void;
+  onChanged: (cb: (mode: SendMode) => void) => () => void;
+  dispose: () => void;
+}
+
+export function initSendMode(defaultMode: SendMode = 'ctrl-enter'): SendModeController {
   const policy = new SendModePolicy(defaultMode);
-
-  // 浮动切换药丸
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'dsh-action-pill dsh-send-mode-pill';
-
-  const render = () => {
-    const mode = policy.getMode();
-    btn.textContent = mode === 'ctrl-enter' ? '⌨️ Ctrl+Enter 发送' : '⌨️ Enter 发送';
-    btn.title = mode === 'ctrl-enter'
-      ? '当前模式：Ctrl+Enter 发送、Enter 换行（点击切换）'
-      : '当前模式：Enter 发送、Shift+Enter 换行（点击切换）';
-  };
-
-  btn.addEventListener('click', () => {
-    policy.toggleMode();
-    render();
-  });
-
-  render();
-  document.body.appendChild(btn);
+  const listeners = new Set<(mode: SendMode) => void>();
 
   const onKeydown = (e: KeyboardEvent) => policy.handleKeydown(e);
   const onCompStart = () => policy.onCompositionStart();
@@ -32,10 +19,26 @@ export function initSendMode(defaultMode: SendMode = 'ctrl-enter'): () => void {
   document.addEventListener('compositionstart', onCompStart, true);
   document.addEventListener('compositionend', onCompEnd, true);
 
-  return () => {
-    window.removeEventListener('keydown', onKeydown, true);
-    document.removeEventListener('compositionstart', onCompStart, true);
-    document.removeEventListener('compositionend', onCompEnd, true);
-    btn.remove();
+  return {
+    getMode: () => policy.getMode(),
+    toggleMode: () => {
+      policy.toggleMode();
+      const mode = policy.getMode();
+      listeners.forEach((cb) => {
+        try {
+          cb(mode);
+        } catch (_) {}
+      });
+    },
+    onChanged: (cb: (mode: SendMode) => void) => {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+    dispose: () => {
+      window.removeEventListener('keydown', onKeydown, true);
+      document.removeEventListener('compositionstart', onCompStart, true);
+      document.removeEventListener('compositionend', onCompEnd, true);
+      listeners.clear();
+    },
   };
 }

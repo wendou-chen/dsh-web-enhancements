@@ -1,7 +1,7 @@
 {
   "name": "dsh-web-enhancements",
-  "version": "0.2.0",
-  "description": "DeepSeek Harness (DSH) Web & Desktop 全能增强套件 (LaTeX公式一键复制 / Mermaid交互渲染 / Voyager划词引用 / 发送模式无缝切换与原生插话 / 输入框智能折叠与沉浸式唤醒 / 7阶启发式LaTeX语法自愈与无损重渲染)",
+  "version": "1.4.0",
+  "description": "DeepSeek Harness (DSH) Web & Desktop 全能增强套件 (工作区路径一键复制 / Shift+Tab模式轮转 / 悬浮控制球 / LaTeX公式一键复制与去重 / Mermaid交互渲染 / 划词引用 / 发送模式无缝切换 / 输入框智能折叠 / 任务提示音与可缩放通知窗 / 7阶启发式LaTeX语法自愈)",
   "type": "module",
   "main": "./lib/index.js",
   "types": "./lib/types/index.d.ts",
@@ -24,6 +24,9 @@
     "deepseek",
     "deepseek-harness",
     "cordis",
+    "workspace-path",
+    "mode-cycle",
+    "floating-ball",
     "latex",
     "mermaid",
     "quote-reply",
@@ -34,6 +37,7 @@
     "cordis": ">=4.0.0-rc <5",
     "schemastery": "^3.18.0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-client-ui-layout": ">=0.0.1-rc <2",
     "@deepseek-ai/dsh-client-runtime": ">=0.0.1-rc <2",
     "react": "^18.0.0 || ^19.0.0"
   },
@@ -67,7 +71,9 @@
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-slots"
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-api-workspace-controller",
+        "@deepseek-ai/dsh-api-session-controller"
       ],
       "platform": "web"
     }

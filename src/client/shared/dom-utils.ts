@@ -1,9 +1,9 @@
-﻿/**
+/**
  * DSH 客户端通用 DOM 与 React 受控组件穿透工具
  *
  * 同时兼容两种 DSH Composer：
- * - Web 端 / Desktop 端：<div contenteditable="true" role="textbox" data-composer-input="true">（基于 Lexical）
- * - 纯文本兜底端：<textarea>
+ * - Web 端：<textarea>
+ * - DSH Desktop（Electron 2.0.x）：<div contenteditable="true" role="textbox" data-composer-input="true">
  */
 
 export type DshComposer = HTMLTextAreaElement | HTMLElement;
@@ -38,8 +38,21 @@ export function findDshTextArea(): HTMLTextAreaElement | null {
   );
 }
 
-export function findDshComposer(): DshComposer | null {
-  // 桌面/Web 端 Lexical contenteditable 优先，避免误匹配页面中的隐藏 textarea
+export function findDshComposer(event?: Event): DshComposer | null {
+  if (event && event.target instanceof Element) {
+    const fromTarget = event.target.closest<HTMLElement>(
+      '[data-composer-input="true"], [role="textbox"][contenteditable="true"], [contenteditable="true"], textarea',
+    );
+    if (fromTarget) return fromTarget;
+  }
+  if (document.activeElement instanceof Element) {
+    const fromActive = document.activeElement.closest<HTMLElement>(
+      '[data-composer-input="true"], [role="textbox"][contenteditable="true"], [contenteditable="true"], textarea',
+    );
+    if (fromActive) return fromActive;
+  }
+
+  // 桌面版 Lexical contenteditable 优先，避免误匹配页面中的隐藏 textarea
   const ce = document.querySelector<HTMLElement>(
     '[data-composer-input="true"], [role="textbox"][contenteditable="true"], [role="textbox"][data-lexical-editor="true"]',
   );
@@ -70,127 +83,38 @@ export function setReactInputValue(element: HTMLTextAreaElement, value: string):
   element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
 }
 
-function findDeepestLastLeaf(root: Node): { node: Node; offset: number } {
-  let curr: Node = root;
-  while (curr.lastChild) {
-    curr = curr.lastChild;
-  }
-  if (curr === root) {
-    return { node: root, offset: 0 };
-  }
-  if (curr.nodeType === Node.TEXT_NODE) {
-    return { node: curr, offset: curr.nodeValue?.length || 0 };
-  }
-  const parent = curr.parentNode;
-  if (parent) {
-    const idx = Array.prototype.indexOf.call(parent.childNodes, curr);
-    return { node: parent, offset: idx + 1 };
-  }
-  return { node: curr, offset: 0 };
-}
-
-export function focusComposerEnd(composer: DshComposer): void {
-  try {
-    composer.focus({ preventScroll: false });
-  } catch (_) {
-    composer.focus();
-  }
-
-  if (isTextArea(composer)) {
-    const len = composer.value.length;
-    try {
-      composer.setSelectionRange(len, len);
-    } catch (_) {}
-    composer.scrollTop = composer.scrollHeight;
-    return;
-  }
-
-  const anyComposer = composer as any;
-  const lexicalEditor = anyComposer.__lexicalEditor;
-  if (lexicalEditor && typeof lexicalEditor.update === 'function') {
-    try {
-      lexicalEditor.update(() => {
-        const root = lexicalEditor._pendingEditorState?._nodeMap?.get('root');
-        root?.selectEnd();
-      });
-      lexicalEditor.focus?.();
-    } catch (_) {}
-  }
-
-  const selection = window.getSelection();
-  if (!selection) return;
-
-  try {
-    const leaf = findDeepestLastLeaf(composer);
-    const range = document.createRange();
-    range.setStart(leaf.node, leaf.offset);
-    range.setEnd(leaf.node, leaf.offset);
-    selection.removeAllRanges();
-    selection.addRange(range);
-  } catch (_) {
-    const range = document.createRange();
-    range.selectNodeContents(composer);
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
-  }
-}
-
 export function setComposerValue(composer: DshComposer, value: string): void {
   if (isTextArea(composer)) {
     setReactInputValue(composer, value);
     return;
   }
 
+  composer.focus();
   const anyComposer = composer as any;
   const lexicalEditor = anyComposer.__lexicalEditor;
 
-  if (lexicalEditor && typeof lexicalEditor.update === 'function') {
-    lexicalEditor.update(() => {
-      const root = lexicalEditor._pendingEditorState?._nodeMap?.get('root');
-      if (!root) return;
-      root.clear();
-
-      if (!value) {
-        const ParagraphKlass = lexicalEditor._nodes?.get('paragraph')?.klass;
-        if (ParagraphKlass) {
-          const p = new ParagraphKlass();
-          root.append(p);
-          p.select();
-        }
-        return;
-      }
-
-      const sel = root.selectEnd();
-      const lines = value.split('\n');
-      lines.forEach((line: string, idx: number) => {
-        if (idx > 0) {
-          sel.insertLineBreak();
-        }
-        if (line) {
-          sel.insertText(line);
-        }
-      });
-      if (/\n\s*$/.test(value)) {
-        sel.insertParagraph();
-      }
-    });
-
+  // 先清空 Lexical 编辑器，再整体插入；避免逐命令插入时光标不移动导致重复
+  if (lexicalEditor && lexicalEditor._commands) {
     try {
-      lexicalEditor.focus();
-    } catch (_) {
-      composer.focus();
-    }
-    focusComposerEnd(composer);
-    composer.dispatchEvent(new Event('input', { bubbles: true, cancelable: true, composed: true }));
-    return;
+      const clearCmd = Array.from(lexicalEditor._commands.keys()).find((c: any) => c?.type === 'CLEAR_EDITOR_COMMAND');
+      if (clearCmd) lexicalEditor.dispatchCommand(clearCmd, undefined);
+    } catch (_) {}
   }
 
-  composer.focus();
   focusComposerEnd(composer);
-  document.execCommand('selectAll', false);
   document.execCommand('insertText', false, value);
-  focusComposerEnd(composer);
+
+  // 值以换行结尾时，补一个真正的空段落（引用回复后空一行）
+  if (/\n\s*$/.test(value) && lexicalEditor && lexicalEditor._commands) {
+    try {
+      const paragraphCmd = Array.from(lexicalEditor._commands.keys()).find((c: any) => c?.type === 'INSERT_PARAGRAPH_COMMAND');
+      if (paragraphCmd) {
+        focusComposerEnd(composer);
+        lexicalEditor.dispatchCommand(paragraphCmd, undefined);
+      }
+    } catch (_) {}
+  }
+
   composer.dispatchEvent(new Event('input', { bubbles: true, cancelable: true, composed: true }));
 }
 
@@ -203,53 +127,59 @@ export function appendComposerQuote(composer: DshComposer, quoteText: string): v
     return;
   }
 
+  composer.focus();
   const anyComposer = composer as any;
   const lexicalEditor = anyComposer.__lexicalEditor;
-
-  if (lexicalEditor && typeof lexicalEditor.update === 'function') {
-    lexicalEditor.update(() => {
-      const root = lexicalEditor._pendingEditorState?._nodeMap?.get('root');
-      if (!root) return;
-
-      const sel = root.selectEnd();
-      const hasText = (root.getTextContent() || '').trim().length > 0;
-      if (hasText) {
-        sel.insertParagraph();
-      }
-
-      const lines = quoteText.split('\n');
-      lines.forEach((line: string, idx: number) => {
-        if (idx > 0) {
-          sel.insertLineBreak();
-        }
-        if (line) {
-          sel.insertText(line);
-        }
-      });
-
-      // 引用插入完成后，再次调用 insertParagraph() 生成供用户直接输入的独立空段落
-      sel.insertParagraph();
-    });
-
-    try {
-      lexicalEditor.focus();
-    } catch (_) {
-      composer.focus();
-    }
-    focusComposerEnd(composer);
+  if (!lexicalEditor || !lexicalEditor._commands) {
+    // 非 Lexical contenteditable 兜底：追加文本 + 两个换行
+    const prev = composer.innerText || '';
+    const next = `${prev.trim() ? prev.replace(/\s+$/, '') + '\n\n' : ''}${quoteText}\n\n`;
+    const selection = window.getSelection();
+    selection?.selectAllChildren(composer);
+    document.execCommand('insertText', false, next);
     composer.dispatchEvent(new Event('input', { bubbles: true, cancelable: true, composed: true }));
     return;
   }
 
-  // 非 Lexical contenteditable 降级兜底
+  try {
+    const cmdOf = (type: string) => Array.from(lexicalEditor._commands.keys()).find((c: any) => c?.type === type);
+    const insertCmd = cmdOf('CONTROLLED_TEXT_INSERTION_COMMAND');
+    const paragraphCmd = cmdOf('INSERT_PARAGRAPH_COMMAND');
+
+    // 光标移到末尾；已有内容时先插入一个段落分隔
+    focusComposerEnd(composer);
+    const hasPrevious = (composer.innerText || '').trim().length > 0;
+    if (hasPrevious && paragraphCmd) {
+      lexicalEditor.dispatchCommand(paragraphCmd, undefined);
+    }
+
+    // 插入引用文本（仅一次，避免重复）
+    if (insertCmd) lexicalEditor.dispatchCommand(insertCmd, quoteText);
+
+    // 引用后补一个空段落（空一行）
+    if (paragraphCmd) lexicalEditor.dispatchCommand(paragraphCmd, undefined);
+
+    focusComposerEnd(composer);
+    composer.dispatchEvent(new Event('input', { bubbles: true, cancelable: true, composed: true }));
+  } catch (_) {}
+}
+
+export function focusComposerEnd(composer: DshComposer): void {
   composer.focus();
-  const prev = composer.innerText || '';
-  const next = `${prev.trim() ? prev.replace(/\s+$/, '') + '\n\n' : ''}${quoteText}\n\n`;
+  if (isTextArea(composer)) {
+    const len = composer.value.length;
+    composer.setSelectionRange(len, len);
+    composer.scrollTop = composer.scrollHeight;
+    return;
+  }
+
   const selection = window.getSelection();
-  selection?.selectAllChildren(composer);
-  document.execCommand('insertText', false, next);
-  focusComposerEnd(composer);
-  composer.dispatchEvent(new Event('input', { bubbles: true, cancelable: true, composed: true }));
+  if (!selection) return;
+  const range = document.createRange();
+  range.selectNodeContents(composer);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 export function insertComposerLineBreak(composer: DshComposer): void {
@@ -270,7 +200,21 @@ export function insertComposerLineBreak(composer: DshComposer): void {
     return;
   }
 
-  // contenteditable：优先走 Lexical 官方 INSERT_LINE_BREAK_COMMAND，保留编辑器 state
+  // Lexical contenteditable：优先派发 Shift+Enter 原生命令（DSH Lexical 官方注册换行契约）
+  try {
+    const shiftEnterEv = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    composer.dispatchEvent(shiftEnterEv);
+  } catch (_) {}
+
+  // 内部 command 兜底
   const anyComposer = composer as any;
   const lexicalEditor = anyComposer.__lexicalEditor;
   if (lexicalEditor && lexicalEditor._commands) {
@@ -289,36 +233,63 @@ export function insertComposerLineBreak(composer: DshComposer): void {
     inserted = document.execCommand('insertText', false, '\n');
   }
   if (!inserted) {
+    // 最后兜底：直接追加换行
     composer.textContent = composer.textContent || '';
     if (!composer.textContent.endsWith('\n')) composer.textContent += '\n';
   }
   composer.dispatchEvent(new Event('input', { bubbles: true, cancelable: true, composed: true }));
 }
 
-export function isStopButton(btn: HTMLButtonElement): boolean {
-  const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
-  const title = (btn.getAttribute('title') || '').toLowerCase();
-  const text = (btn.innerText || '').toLowerCase();
-  return /停止|stop|终止|cancel|取消/.test(aria) || /停止|stop|终止|cancel|取消/.test(title) || /停止|stop|终止|cancel|取消/.test(text);
-}
+export function findSendButton(composer?: DshComposer | null): HTMLButtonElement | null {
+  const card = composer ? composer.closest('[data-composer-card="true"], form, [class*="_card"], [class*="_root"]') : null;
+  const scope: Element | Document = card || document;
+  const buttons = Array.from(scope.querySelectorAll<HTMLButtonElement>('button'));
 
-export function findSendButton(): HTMLButtonElement | null {
-  const candidates = Array.from(document.querySelectorAll<HTMLButtonElement>(
-    'button[aria-label*="发送"], button[aria-label*="send"], [class*="_sendButton"] button, button[class*="_primary"]'
-  ));
-  for (const btn of candidates) {
-    if (isStopButton(btn)) {
-      continue;
-    }
-    const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
-    const text = (btn.innerText || '').toLowerCase();
-    if (/发送|send/.test(aria) || /发送|send/.test(text) || btn.className.includes('_sendButton')) {
+  const isMenuOrSelectButton = (btn: HTMLButtonElement): boolean => {
+    const popup = btn.getAttribute('aria-haspopup');
+    if (popup && popup !== 'false') return true;
+    const cls = btn.className || '';
+    if (cls.includes('select') || cls.includes('Select') || cls.includes('_model')) return true;
+    if (btn.hasAttribute('aria-expanded') && !cls.includes('_primary')) return true;
+    return false;
+  };
+
+  const isStopButton = (btn: HTMLButtonElement): boolean => {
+    const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+    return label.includes('停止') || label.includes('stop');
+  };
+
+  // 1. 优先匹配明确是 primary 的发送/排队按钮
+  for (const btn of buttons) {
+    if (isMenuOrSelectButton(btn) || isStopButton(btn)) continue;
+    const cls = btn.className || '';
+    const isPrimary = cls.includes('_primary') || cls.includes('_sendButton') || cls.includes('_send');
+    const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+    const hasSendLabel = /发送|排队|插话|send|queue|steer/.test(label);
+    if (isPrimary && (hasSendLabel || !label)) {
       return btn;
     }
   }
-  return null;
-}
 
-export function isAgentRunning(): boolean {
-  return Array.from(document.querySelectorAll<HTMLButtonElement>('button')).some(isStopButton);
+  // 2. 匹配带有明确发送/排队语义的按钮
+  for (const btn of buttons) {
+    if (isMenuOrSelectButton(btn) || isStopButton(btn)) continue;
+    const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+    if (/发送|排队|插话|send|queue|steer/.test(label)) {
+      return btn;
+    }
+  }
+
+  // 3. 兜底匹配 trailing 区域中的 primary 按钮（排除模型与停止按钮）
+  for (const btn of buttons) {
+    if (isMenuOrSelectButton(btn) || isStopButton(btn)) continue;
+    if (!btn.closest('[class*="_trailing"]')) continue;
+    if ((btn.className || '').includes('_primary')) {
+      return btn;
+    }
+  }
+
+  return document.querySelector<HTMLButtonElement>(
+    'button[aria-label="发送消息"], button[aria-label*="发送"], button[aria-label="send message"], button[aria-label*="send"]',
+  );
 }

@@ -100,14 +100,16 @@ export class MermaidManager {
 
     this.currentTheme = isDark ? 'dark' : 'default';
 
-    window.mermaid.initialize({
-      startOnLoad: false,
-      theme: this.currentTheme,
-      securityLevel: 'strict',
-      suppressErrorRendering: true,
-      fontFamily: 'inherit',
-      flowchart: { htmlLabels: true, curve: 'linear' },
-    });
+    try {
+      window.mermaid.initialize({
+        startOnLoad: false,
+        theme: this.currentTheme,
+        securityLevel: 'strict',
+        suppressErrorRendering: true,
+        fontFamily: 'inherit',
+        flowchart: { htmlLabels: true, curve: 'linear' },
+      });
+    } catch (_) {}
   }
 
   private initTheme(): void {
@@ -133,7 +135,16 @@ export class MermaidManager {
       for (const m of mutations) {
         for (const node of Array.from(m.addedNodes)) {
           if (node.nodeType === Node.ELEMENT_NODE) {
-            this.scanAndRender(node as Element);
+            const el = node as Element;
+            // 严禁对自身注入的 wrapper 或 modal 重复触发扫描
+            if (
+              el.classList?.contains('dsh-mermaid-wrapper') ||
+              el.classList?.contains('dsh-mermaid-modal') ||
+              el.closest?.('.dsh-mermaid-wrapper, .dsh-mermaid-modal')
+            ) {
+              continue;
+            }
+            this.scanAndRender(el);
           }
         }
       }
@@ -171,6 +182,9 @@ export class MermaidManager {
   }
 
   private async renderBlock(preEl: HTMLElement, rawCode: string): Promise<void> {
+    if (this.renderedNodes.has(preEl) || !preEl.isConnected) return;
+    this.renderedNodes.add(preEl);
+
     const chartId = `dsh-mermaid-${Math.random().toString(36).slice(2, 9)}`;
 
     try {
@@ -226,7 +240,6 @@ export class MermaidManager {
 
       preEl.style.display = 'none';
       preEl.parentNode?.insertBefore(wrapper, preEl);
-      this.renderedNodes.add(preEl);
 
       this.bindToolbar(wrapper, chartId, rawCode, preEl);
     } catch (err: any) {
@@ -262,7 +275,6 @@ export class MermaidManager {
       isDragging = true;
       startX = e.clientX - translateX;
       startY = e.clientY - translateY;
-      canvas.style.cursor = 'grabbing';
     });
 
     window.addEventListener('mousemove', (e) => {
@@ -274,7 +286,6 @@ export class MermaidManager {
 
     window.addEventListener('mouseup', () => {
       isDragging = false;
-      canvas.style.cursor = 'grab';
     });
 
     wrapper.querySelector('.dsh-mermaid-toolbar')?.addEventListener('click', async (e) => {
