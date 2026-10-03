@@ -1,5 +1,4 @@
-﻿import { showToast } from '../../shared/toast.js';
-import {
+﻿import {
   findDshComposer,
   isTextArea,
   setReactInputValue,
@@ -260,7 +259,7 @@ export function isCustomAgentPreset(ctx?: any, sessionId?: string): boolean {
 }
 
 /**
- * 初始化 Shift+Tab 模式快速轮转控制器
+ * 初始化 Shift+Tab 模式快速轮转控制器（纯净极速切换，无多余横幅打扰）
  */
 export function initModeCycle(ctx?: any): ModeCycleController {
   let isCycling = false;
@@ -272,7 +271,6 @@ export function initModeCycle(ctx?: any): ModeCycleController {
     try {
       const composer = findDshComposer();
       if (!composer) {
-        showToast('⚠️ 未定位到输入框', '请先进入或新建一个会话', true, 1800);
         return;
       }
 
@@ -292,26 +290,22 @@ export function initModeCycle(ctx?: any): ModeCycleController {
         // 在输入框内顶格嵌入 "/plan " 并激活黄色高亮
         nextMode = 'plan';
         await setComposerCommandText(composer, '/plan', stripped);
-        showToast('🎯 已切换至「Plan 计划模式」', '输入框已顶格嵌入 /plan 并进入计划模式', false, 1800);
       } else if (currentMode === 'plan') {
         // 状态 2: Plan 模式
         if (isCustom) {
           // 自定义 Agent 预设：无 Goal 模式，直接切回标准模式
           nextMode = 'standard';
           await setComposerCommandText(composer, '', stripped);
-          showToast('⚡ 已切换至「标准模式」', '已清除 /plan 指令，恢复常规对话', false, 1800);
         } else {
           // 默认 Agent：切换至 Goal 模式
           // 在输入框内顶格嵌入 "/goal " 并激活黄色高亮
           nextMode = 'goal';
           await setComposerCommandText(composer, '/goal', stripped);
-          showToast('🏁 已切换至「Goal 目标模式」', '输入框已顶格嵌入 /goal 并进入目标模式', false, 1800);
         }
       } else if (currentMode === 'goal') {
         // 状态 3: Goal 模式 -> 切回标准模式
         nextMode = 'standard';
         await setComposerCommandText(composer, '', stripped);
-        showToast('⚡ 已切换至「标准模式」', '已清除指令，恢复常规对话', false, 1800);
       }
 
       // 如果页面上有旧的 Plan Chip 激活按钮，同步点击退出
